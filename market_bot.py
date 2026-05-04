@@ -1,7 +1,8 @@
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ConversationHandler, ContextTypes, filters
 
-TOKEN = "8255931477:AAGiqYP-grvQt_8U5lWFab5YweK2tGBRYUw"
+TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = -1003976150797
 
 TITEL, PREIS, BESCHREIBUNG, KONTAKT, BILD, FEATURED = range(6)
