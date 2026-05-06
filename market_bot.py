@@ -15,17 +15,6 @@ CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1003976150797"))
 TITEL, PREIS, BESCHREIBUNG, KONTAKT, BILD, FEATURED = range(6)
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "🛒 NdeGroundArt Marketplace\n\n"
-        "Hier können Kunstwerke, Kunstangebote und kreative Arbeiten eingestellt werden.\n\n"
-        "Befehle:\n"
-        "/verkaufen - Kunstangebot erstellen\n"
-        "/suche - Suche im Marketplace\n"
-        "/abbrechen - Vorgang abbrechen"
-    )
-
-
 async def verkaufen(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type != "private":
         username = context.bot.username
@@ -105,9 +94,16 @@ async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if bild_file:
-            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=bild_file, caption=text)
+            await context.bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=bild_file,
+                caption=text
+            )
         else:
-            await context.bot.send_message(chat_id=CHANNEL_ID, text=text)
+            await context.bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=text
+            )
 
         await update.message.reply_text("✅ Dein Kunstangebot wurde veröffentlicht!")
 
@@ -158,7 +154,6 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "❓ Befehl nicht erkannt.\n\n"
         "Nutze:\n"
-        "/start\n"
         "/verkaufen\n"
         "/suche\n"
         "/abbrechen"
@@ -167,7 +162,9 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not TOKEN:
-        raise RuntimeError("TOKEN fehlt. Setze TOKEN in Render Environment Variables.")
+        raise RuntimeError(
+            "TOKEN fehlt. Setze TOKEN in Render Environment Variables."
+        )
 
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -184,7 +181,6 @@ def main():
         fallbacks=[CommandHandler("abbrechen", abbrechen)],
     )
 
-    app.add_handler(CommandHandler("start", start))
     app.add_handler(verkaufen_handler)
     app.add_handler(CommandHandler("suche", suche))
     app.add_handler(CommandHandler("abbrechen", abbrechen))
