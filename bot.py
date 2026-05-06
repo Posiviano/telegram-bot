@@ -107,6 +107,9 @@ async def welcome_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+
     await update.message.reply_text(
         "❓ Befehl nicht erkannt.\n\n"
         "Nutze:\n"
