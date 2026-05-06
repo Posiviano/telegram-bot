@@ -26,8 +26,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def verkaufen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     if update.effective_chat.type != "private":
         username = context.bot.username
+
         await update.message.reply_text(
             f"📩 Bitte schreib mir privat:\n👉 @{username}\n\n"
             "Dort kannst du dein Angebot erstellen."
@@ -35,10 +37,12 @@ async def verkaufen(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     context.user_data.clear()
+
     await update.message.reply_text(
         "🎨 Verkauf starten!\n\n"
         "Schreib den Titel deines Angebots:"
     )
+
     return TITEL
 
 
@@ -56,105 +60,89 @@ async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def beschreibung(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["beschreibung"] = update.message.text
-    await update.message.reply_text("📬 Kontakt / Instagram / Website?")
+    await update.message.reply_text("📱 Kontakt / Instagram / Webseite?")
     return KONTAKT
 
 
 async def kontakt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["kontakt"] = update.message.text
-    await update.message.reply_text("🖼 Bild senden oder `skip` schreiben.")
+
+    await update.message.reply_text(
+        "🖼 Bild senden oder 'skip' schreiben."
+    )
+
     return BILD
 
 
 async def bild(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.photo:
-        context.user_data["photo"] = update.message.photo[-1].file_id
-    elif update.message.text and update.message.text.lower() == "skip":
-        context.user_data["photo"] = None
+
+    if update.message.text and update.message.text.lower() == "skip":
+        context.user_data["bild"] = None
     else:
-        await update.message.reply_text("Bitte Bild senden oder `skip` schreiben.")
-        return BILD
+        photo = update.message.photo[-1]
+        context.user_data["bild"] = photo.file_id
 
     await update.message.reply_text(
-        "🔥 Featured?\n\n"
-        "1 = Normal\n"
-        "2 = Featured"
+        "⭐ Featured Post?\nJa oder Nein"
     )
+
     return FEATURED
 
 
 async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    choice = update.message.text.strip()
 
-    title = context.user_data.get("titel", "")
-    price = context.user_data.get("preis", "")
-    desc = context.user_data.get("beschreibung", "")
-    contact = context.user_data.get("kontakt", "")
-    photo = context.user_data.get("photo")
+    featured_text = update.message.text
 
-    if choice == "2":
-        status = "🔥 FEATURED ANGEBOT"
-        note = "\n\n💎 Featured gewählt: Bitte Admin für Zahlung kontaktieren."
-    else:
-        status = "🎨 ANGEBOT"
-        note = ""
+    titel_text = context.user_data["titel"]
+    preis_text = context.user_data["preis"]
+    beschreibung_text = context.user_data["beschreibung"]
+    kontakt_text = context.user_data["kontakt"]
+    bild_file = context.user_data["bild"]
 
-    post = (
-        f"{status}\n\n"
-        f"🖼 Titel: {title}\n"
-        f"💰 Preis: {price}\n"
-        f"📝 Beschreibung: {desc}\n"
-        f"📬 Kontakt / Link: {contact}\n\n"
-        f"🔐 Hinweis: Private Abwicklung möglich. Sichere Abwicklung über das Team optional."
-        f"{note}\n\n"
-        f"#kunst #ndegroundart #market"
+    text = (
+        f"🎨 {titel_text}\n\n"
+        f"💰 Preis: {preis_text}\n\n"
+        f"📝 {beschreibung_text}\n\n"
+        f"📱 Kontakt:\n{kontakt_text}\n\n"
+        f"⭐ Featured: {featured_text}"
     )
 
-    try:
-        if photo:
-            await context.bot.send_photo(
-                chat_id=CHANNEL_ID,
-                photo=photo,
-                caption=post,
-            )
-        else:
-            await context.bot.send_message(
-                chat_id=CHANNEL_ID,
-                text=post,
-            )
-
-        await update.message.reply_text("✅ Dein Angebot wurde im Marketplace-Kanal gepostet.")
-
-    except Exception as e:
-        await update.message.reply_text(
-            "❌ Fehler beim Posten in den Kanal.\n\n"
-            "Prüfe:\n"
-            "1. Bot ist Admin im Kanal\n"
-            "2. Bot darf Nachrichten senden\n"
-            "3. CHANNEL_ID stimmt"
+    if bild_file:
+        await context.bot.send_photo(
+            chat_id=CHANNEL_ID,
+            photo=bild_file,
+            caption=text
         )
-        print(f"Fehler beim Posten: {e}")
+    else:
+        await context.bot.send_message(
+            chat_id=CHANNEL_ID,
+            text=text
+        )
 
-    context.user_data.clear()
+    await update.message.reply_text(
+        "✅ Angebot veröffentlicht!"
+    )
+
     return ConversationHandler.END
 
 
 async def suche(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type != "private":
+
+    if not context.args:
         await update.message.reply_text(
-            "🔍 Für die Suche bitte privat schreiben.\n"
-            "Marketplace-Suche kommt bald."
+            "🔍 Beispiel:\n/suche Pokémon"
         )
         return
 
+    suchwort = " ".join(context.args)
+
     await update.message.reply_text(
-        "🔍 Suche kommt bald.\n\n"
-        "Aktuell kannst du den Marketplace-Kanal direkt durchsuchen."
+        f"🔎 Suche nach: {suchwort}\n\n"
+        "Die Suchfunktion kann später erweitert werden."
     )
 
 
 async def abbrechen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data.clear()
     await update.message.reply_text("❌ Vorgang abgebrochen.")
     return ConversationHandler.END
 
@@ -170,31 +158,53 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+
     if not TOKEN:
-        raise RuntimeError("TOKEN fehlt. Setze TOKEN in Render Environment Variables.")
+        raise RuntimeError(
+            "TOKEN fehlt. Setze TOKEN in Render Environment Variables."
+        )
 
     app = ApplicationBuilder().token(TOKEN).build()
 
     verkaufen_handler = ConversationHandler(
         entry_points=[CommandHandler("verkaufen", verkaufen)],
         states={
-            TITEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, titel)],
-            PREIS: [MessageHandler(filters.TEXT & ~filters.COMMAND, preis)],
-            BESCHREIBUNG: [MessageHandler(filters.TEXT & ~filters.COMMAND, beschreibung)],
-            KONTAKT: [MessageHandler(filters.TEXT & ~filters.COMMAND, kontakt)],
-            BILD: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, bild)],
-            FEATURED: [MessageHandler(filters.TEXT & ~filters.COMMAND, featured)],
+            TITEL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, titel)
+            ],
+            PREIS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, preis)
+            ],
+            BESCHREIBUNG: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, beschreibung)
+            ],
+            KONTAKT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, kontakt)
+            ],
+            BILD: [
+                MessageHandler(
+                    (filters.PHOTO | filters.TEXT)
+                    & ~filters.COMMAND,
+                    bild
+                )
+            ],
+            FEATURED: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, featured)
+            ],
         },
-        fallbacks=[CommandHandler("abbrechen", abbrechen)],
+        fallbacks=[
+            CommandHandler("abbrechen", abbrechen)
+        ],
     )
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(verkaufen_handler)
     app.add_handler(CommandHandler("suche", suche))
     app.add_handler(CommandHandler("abbrechen", abbrechen))
-    app.add_handler(verkaufen_handler)
     app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
     print("Market Bot läuft...")
+
     app.run_polling()
 
 
