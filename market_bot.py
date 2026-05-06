@@ -105,16 +105,9 @@ async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         if bild_file:
-            await context.bot.send_photo(
-                chat_id=CHANNEL_ID,
-                photo=bild_file,
-                caption=text
-            )
+            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=bild_file, caption=text)
         else:
-            await context.bot.send_message(
-                chat_id=CHANNEL_ID,
-                text=text
-            )
+            await context.bot.send_message(chat_id=CHANNEL_ID, text=text)
 
         await update.message.reply_text("✅ Dein Kunstangebot wurde veröffentlicht!")
 
@@ -159,6 +152,9 @@ async def abbrechen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type != "private":
+        return
+
     await update.message.reply_text(
         "❓ Befehl nicht erkannt.\n\n"
         "Nutze:\n"
@@ -171,41 +167,21 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     if not TOKEN:
-        raise RuntimeError(
-            "TOKEN fehlt. Setze TOKEN in Render Environment Variables."
-        )
+        raise RuntimeError("TOKEN fehlt. Setze TOKEN in Render Environment Variables.")
 
     app = ApplicationBuilder().token(TOKEN).build()
 
     verkaufen_handler = ConversationHandler(
         entry_points=[CommandHandler("verkaufen", verkaufen)],
         states={
-            TITEL: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, titel)
-            ],
-            PREIS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, preis)
-            ],
-            BESCHREIBUNG: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, beschreibung)
-            ],
-            KONTAKT: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, kontakt)
-            ],
-            BILD: [
-                MessageHandler(
-                    (filters.PHOTO | filters.TEXT)
-                    & ~filters.COMMAND,
-                    bild
-                )
-            ],
-            FEATURED: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, featured)
-            ],
+            TITEL: [MessageHandler(filters.TEXT & ~filters.COMMAND, titel)],
+            PREIS: [MessageHandler(filters.TEXT & ~filters.COMMAND, preis)],
+            BESCHREIBUNG: [MessageHandler(filters.TEXT & ~filters.COMMAND, beschreibung)],
+            KONTAKT: [MessageHandler(filters.TEXT & ~filters.COMMAND, kontakt)],
+            BILD: [MessageHandler((filters.PHOTO | filters.TEXT) & ~filters.COMMAND, bild)],
+            FEATURED: [MessageHandler(filters.TEXT & ~filters.COMMAND, featured)],
         },
-        fallbacks=[
-            CommandHandler("abbrechen", abbrechen)
-        ],
+        fallbacks=[CommandHandler("abbrechen", abbrechen)],
     )
 
     app.add_handler(CommandHandler("start", start))
