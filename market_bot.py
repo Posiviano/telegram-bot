@@ -18,43 +18,40 @@ TITEL, PREIS, BESCHREIBUNG, KONTAKT, BILD, FEATURED = range(6)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🛒 NdeGroundArt Marketplace\n\n"
+        "Hier können Kunstwerke, Kunstangebote und kreative Arbeiten eingestellt werden.\n\n"
         "Befehle:\n"
-        "/verkaufen - Angebot erstellen\n"
+        "/verkaufen - Kunstangebot erstellen\n"
         "/suche - Suche im Marketplace\n"
         "/abbrechen - Vorgang abbrechen"
     )
 
 
 async def verkaufen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if update.effective_chat.type != "private":
         username = context.bot.username
-
         await update.message.reply_text(
             f"📩 Bitte schreib mir privat:\n👉 @{username}\n\n"
-            "Dort kannst du dein Angebot erstellen."
+            "Dort kannst du dein Kunstangebot erstellen."
         )
         return ConversationHandler.END
 
     context.user_data.clear()
-
     await update.message.reply_text(
-        "🎨 Verkauf starten!\n\n"
-        "Schreib den Titel deines Angebots:"
+        "🎨 Kunstangebot erstellen!\n\n"
+        "Schreib den Titel deines Kunstwerks oder Angebots:"
     )
-
     return TITEL
 
 
 async def titel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["titel"] = update.message.text
-    await update.message.reply_text("💰 Preis?")
+    await update.message.reply_text("💰 Preis oder Preisvorstellung?")
     return PREIS
 
 
 async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["preis"] = update.message.text
-    await update.message.reply_text("📝 Beschreibung?")
+    await update.message.reply_text("📝 Beschreibung des Kunstwerks / Angebots?")
     return BESCHREIBUNG
 
 
@@ -66,31 +63,28 @@ async def beschreibung(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def kontakt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["kontakt"] = update.message.text
-
-    await update.message.reply_text(
-        "🖼 Bild senden oder 'skip' schreiben."
-    )
-
+    await update.message.reply_text("🖼 Bild senden oder 'skip' schreiben.")
     return BILD
 
 
 async def bild(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if update.message.text and update.message.text.lower() == "skip":
         context.user_data["bild"] = None
-    else:
+    elif update.message.photo:
         photo = update.message.photo[-1]
         context.user_data["bild"] = photo.file_id
+    else:
+        await update.message.reply_text("Bitte ein Bild senden oder 'skip' schreiben.")
+        return BILD
 
     await update.message.reply_text(
-        "⭐ Featured Post?\nJa oder Nein"
+        "⭐ Featured Post?\n\n"
+        "Schreib: Ja oder Nein"
     )
-
     return FEATURED
 
 
 async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     featured_text = update.message.text
 
     titel_text = context.user_data["titel"]
@@ -100,37 +94,52 @@ async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bild_file = context.user_data["bild"]
 
     text = (
-        f"🎨 {titel_text}\n\n"
+        f"🎨 KUNSTANGEBOT\n\n"
+        f"🖼 Titel: {titel_text}\n\n"
         f"💰 Preis: {preis_text}\n\n"
-        f"📝 {beschreibung_text}\n\n"
-        f"📱 Kontakt:\n{kontakt_text}\n\n"
-        f"⭐ Featured: {featured_text}"
+        f"📝 Beschreibung:\n{beschreibung_text}\n\n"
+        f"📱 Kontakt / Link:\n{kontakt_text}\n\n"
+        f"⭐ Featured: {featured_text}\n\n"
+        f"#kunst #artist #ndegroundart #marketplace"
     )
 
-    if bild_file:
-        await context.bot.send_photo(
-            chat_id=CHANNEL_ID,
-            photo=bild_file,
-            caption=text
-        )
-    else:
-        await context.bot.send_message(
-            chat_id=CHANNEL_ID,
-            text=text
-        )
+    try:
+        if bild_file:
+            await context.bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=bild_file,
+                caption=text
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=text
+            )
 
-    await update.message.reply_text(
-        "✅ Angebot veröffentlicht!"
-    )
+        await update.message.reply_text("✅ Dein Kunstangebot wurde veröffentlicht!")
 
+    except Exception as e:
+        await update.message.reply_text(
+            "❌ Fehler beim Posten in den Kanal.\n\n"
+            "Bitte prüfe:\n"
+            "1. Bot ist Admin im Marketplace-Kanal\n"
+            "2. Bot darf Nachrichten senden\n"
+            "3. CHANNEL_ID stimmt in Render"
+        )
+        print(f"Fehler beim Posten: {e}")
+
+    context.user_data.clear()
     return ConversationHandler.END
 
 
 async def suche(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     if not context.args:
         await update.message.reply_text(
-            "🔍 Beispiel:\n/suche Pokémon"
+            "🔍 Beispiel:\n"
+            "/suche Acryl\n"
+            "/suche Leinwand\n"
+            "/suche Skulptur\n"
+            "/suche Fotografie"
         )
         return
 
@@ -138,11 +147,13 @@ async def suche(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         f"🔎 Suche nach: {suchwort}\n\n"
-        "Die Suchfunktion kann später erweitert werden."
+        "Die Marketplace-Suche kann später erweitert werden.\n"
+        "Aktuell kannst du den Marketplace-Kanal direkt nach Kunstwerken durchsuchen."
     )
 
 
 async def abbrechen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
     await update.message.reply_text("❌ Vorgang abgebrochen.")
     return ConversationHandler.END
 
@@ -153,12 +164,12 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Nutze:\n"
         "/start\n"
         "/verkaufen\n"
-        "/suche"
+        "/suche\n"
+        "/abbrechen"
     )
 
 
 def main():
-
     if not TOKEN:
         raise RuntimeError(
             "TOKEN fehlt. Setze TOKEN in Render Environment Variables."
@@ -203,8 +214,7 @@ def main():
     app.add_handler(CommandHandler("abbrechen", abbrechen))
     app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
-    print("Market Bot läuft...")
-
+    print("NdeGroundArt Market Bot läuft...")
     app.run_polling()
 
 
