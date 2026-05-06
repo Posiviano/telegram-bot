@@ -4,116 +4,174 @@ from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
     MessageHandler,
+    ConversationHandler,
     ContextTypes,
     filters,
 )
 
 TOKEN = os.getenv("TOKEN")
+CHANNEL_ID = int(os.getenv("CHANNEL_ID", "-1003976150797"))
 
-
-WELCOME_TEXT = (
-    "🎨 Willkommen bei NdeGroundArt!\n\n"
-    "Hier treffen sich Künstler, Sammler und Kunstbegeisterte aus der Schweiz, "
-    "Deutschland, Österreich und darüber hinaus.\n\n"
-    "NdeGroundArt soll Künstler und Sammler verbinden, Austausch ermöglichen "
-    "und Raum für Kunst, Erfahrungen, Angebote und neue Kontakte schaffen.\n\n"
-    "📌 Wichtig:\n"
-    "Unsere Gruppe befindet sich noch im Aufbau. Regeln, Abläufe, Funktionen "
-    "und einzelne Bereiche können sich noch ändern oder erweitert werden.\n\n"
-    "Bitte lies zuerst die Regeln:\n"
-    "/regeln\n\n"
-    "Und stelle dich gerne kurz vor:\n"
-    "/vorstellen\n\n"
-    "Schön bist du Teil der Community. 🖤🎨"
-)
-
-
-RULES_TEXT = (
-    "📌 Regeln bei NdeGroundArt:\n\n"
-    "1. Respektvoller Umgang ist Pflicht.\n"
-    "2. Keine Beleidigungen, kein Hass, kein Spam.\n"
-    "3. Nur echte Kunst, ehrliche Angebote und seriöser Austausch.\n"
-    "4. Künstler, Sammler und Kunstbegeisterte sind willkommen.\n"
-    "5. Neue Mitglieder sollen die Regeln lesen und sich kurz vorstellen.\n"
-    "6. Kauf, Verkauf oder Austausch erfolgen fair und transparent.\n"
-    "7. Bei Unsicherheiten kann das Team/Admin helfen.\n\n"
-    "⚠️ Hinweis:\n"
-    "Die Gruppe befindet sich noch im Aufbau. Regeln, Funktionen und Abläufe "
-    "können sich noch ändern oder erweitert werden.\n\n"
-    "Danke, dass du Teil der Community bist. 🎨"
-)
-
-
-INTRO_TEXT = (
-    "🎨 Vorlage für deine Vorstellung:\n\n"
-    "Künstlername / Name:\n"
-    "Land / Region:\n"
-    "Kunstrichtung:\n"
-    "Instagram / Webseite:\n"
-    "Was macht deine Kunst oder dein Interesse an Kunst aus?\n\n"
-    "Kopiere die Vorlage und fülle sie aus."
-)
-
-
-HELP_TEXT = (
-    "🖤 NdeGroundArt Bot Hilfe\n\n"
-    "Befehle:\n"
-    "/start - Willkommensnachricht anzeigen\n"
-    "/regeln - Gruppenregeln anzeigen\n"
-    "/vorstellen - Vorlage für Vorstellung anzeigen\n"
-    "/hilfe - Hilfe anzeigen\n\n"
-    "⚠️ Hinweis:\n"
-    "Der Bot und die Gruppe befinden sich noch im Aufbau. Funktionen und Texte "
-    "können sich noch ändern."
-)
+TITEL, PREIS, BESCHREIBUNG, KONTAKT, BILD, FEATURED = range(6)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(WELCOME_TEXT)
+    await update.message.reply_text(
+        "🛒 NdeGroundArt Marketplace\n\n"
+        "Hier können Kunstwerke, Kunstangebote und kreative Arbeiten eingestellt werden.\n\n"
+        "Befehle:\n"
+        "/verkaufen - Kunstangebot erstellen\n"
+        "/suche - Suche im Marketplace\n"
+        "/abbrechen - Vorgang abbrechen"
+    )
 
 
-async def regeln(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(RULES_TEXT)
+async def verkaufen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # In Gruppen nur Hinweis geben, dass die Erstellung privat gemacht wird
+    if update.effective_chat.type != "private":
+        username = context.bot.username
+        await update.message.reply_text(
+            f"📩 Bitte schreib mir privat:\n👉 @{username}\n\n"
+            "Dort kannst du dein Kunstangebot erstellen."
+        )
+        return ConversationHandler.END
+
+    context.user_data.clear()
+    await update.message.reply_text(
+        "🎨 Kunstangebot erstellen!\n\n"
+        "Schreib den Titel deines Kunstwerks oder Angebots:"
+    )
+    return TITEL
 
 
-async def vorstellen(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(INTRO_TEXT)
+async def titel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["titel"] = update.message.text
+    await update.message.reply_text("💰 Preis oder Preisvorstellung?")
+    return PREIS
 
 
-async def hilfe(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(HELP_TEXT)
+async def preis(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["preis"] = update.message.text
+    await update.message.reply_text("📝 Beschreibung des Kunstwerks / Angebots?")
+    return BESCHREIBUNG
 
 
-async def welcome_new_members(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message or not update.message.new_chat_members:
+async def beschreibung(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["beschreibung"] = update.message.text
+    await update.message.reply_text("📱 Kontakt / Instagram / Webseite?")
+    return KONTAKT
+
+
+async def kontakt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["kontakt"] = update.message.text
+    await update.message.reply_text("🖼 Bild senden oder 'skip' schreiben.")
+    return BILD
+
+
+async def bild(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.text and update.message.text.lower() == "skip":
+        context.user_data["bild"] = None
+    elif update.message.photo:
+        photo = update.message.photo[-1]
+        context.user_data["bild"] = photo.file_id
+    else:
+        await update.message.reply_text("Bitte ein Bild senden oder 'skip' schreiben.")
+        return BILD
+
+    await update.message.reply_text(
+        "⭐ Featured Post?\n\n"
+        "Schreib: Ja oder Nein"
+    )
+    return FEATURED
+
+
+async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    featured_text = update.message.text
+
+    titel_text = context.user_data["titel"]
+    preis_text = context.user_data["preis"]
+    beschreibung_text = context.user_data["beschreibung"]
+    kontakt_text = context.user_data["kontakt"]
+    bild_file = context.user_data["bild"]
+
+    text = (
+        f"🎨 KUNSTANGEBOT\n\n"
+        f"🖼 Titel: {titel_text}\n\n"
+        f"💰 Preis: {preis_text}\n\n"
+        f"📝 Beschreibung:\n{beschreibung_text}\n\n"
+        f"📱 Kontakt / Link:\n{kontakt_text}\n\n"
+        f"⭐ Featured: {featured_text}\n\n"
+        f"#kunst #artist #ndegroundart #marketplace"
+    )
+
+    try:
+        if bild_file:
+            await context.bot.send_photo(
+                chat_id=CHANNEL_ID,
+                photo=bild_file,
+                caption=text
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=CHANNEL_ID,
+                text=text
+            )
+
+        await update.message.reply_text("✅ Dein Kunstangebot wurde veröffentlicht!")
+
+    except Exception as e:
+        await update.message.reply_text(
+            "❌ Fehler beim Posten in den Kanal.\n\n"
+            "Bitte prüfe:\n"
+            "1. Bot ist Admin im Marketplace-Kanal\n"
+            "2. Bot darf Nachrichten senden\n"
+            "3. CHANNEL_ID stimmt in Render"
+        )
+        print(f"Fehler beim Posten: {e}")
+
+    context.user_data.clear()
+    return ConversationHandler.END
+
+
+async def suche(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text(
+            "🔍 Beispiel:\n"
+            "/suche Acryl\n"
+            "/suche Leinwand\n"
+            "/suche Skulptur\n"
+            "/suche Fotografie"
+        )
         return
 
-    for member in update.message.new_chat_members:
-        if member.is_bot:
-            continue
+    suchwort = " ".join(context.args)
 
-        await update.message.reply_text(
-            f"🎨 Willkommen bei NdeGroundArt, {member.first_name}!\n\n"
-            "Schön bist du Teil unserer Community.\n\n"
-            "Bitte lies zuerst die Regeln:\n"
-            "/regeln\n\n"
-            "Und stelle dich gerne kurz vor:\n"
-            "/vorstellen\n\n"
-            "⚠️ Hinweis:\n"
-            "Die Gruppe befindet sich noch im Aufbau. Regeln, Abläufe und Funktionen "
-            "können sich noch ändern oder erweitert werden.\n\n"
-            "Viel Freude beim Austausch mit Künstlern, Sammlern und Kunstbegeisterten. 🖤"
-        )
+    await update.message.reply_text(
+        f"🔎 Suche nach: {suchwort}\n\n"
+        "Die Marketplace-Suche kann später erweitert werden.\n"
+        "Aktuell kannst du den Marketplace-Kanal direkt nach Kunstwerken durchsuchen."
+    )
+
+
+async def abbrechen(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data.clear()
+    await update.message.reply_text("❌ Vorgang abgebrochen.")
+    return ConversationHandler.END
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # In Gruppen fremde Befehle ignorieren,
+    # damit der Gruppenbot z.B. /regeln, /vorstellen, /hilfe beantworten kann.
+    if update.effective_chat.type != "private":
+        return
+
     await update.message.reply_text(
         "❓ Befehl nicht erkannt.\n\n"
         "Nutze:\n"
         "/start\n"
-        "/regeln\n"
-        "/vorstellen\n"
-        "/hilfe"
+        "/verkaufen\n"
+        "/suche\n"
+        "/abbrechen"
     )
 
 
@@ -125,16 +183,44 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
+    verkaufen_handler = ConversationHandler(
+        entry_points=[CommandHandler("verkaufen", verkaufen)],
+        states={
+            TITEL: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, titel)
+            ],
+            PREIS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, preis)
+            ],
+            BESCHREIBUNG: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, beschreibung)
+            ],
+            KONTAKT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, kontakt)
+            ],
+            BILD: [
+                MessageHandler(
+                    (filters.PHOTO | filters.TEXT)
+                    & ~filters.COMMAND,
+                    bild
+                )
+            ],
+            FEATURED: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, featured)
+            ],
+        },
+        fallbacks=[
+            CommandHandler("abbrechen", abbrechen)
+        ],
+    )
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("regeln", regeln))
-    app.add_handler(CommandHandler("vorstellen", vorstellen))
-    app.add_handler(CommandHandler("hilfe", hilfe))
-
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_members))
-
+    app.add_handler(verkaufen_handler)
+    app.add_handler(CommandHandler("suche", suche))
+    app.add_handler(CommandHandler("abbrechen", abbrechen))
     app.add_handler(MessageHandler(filters.COMMAND, unknown))
 
-    print("NdeGroundArt Gruppenbot läuft...")
+    print("NdeGroundArt Market Bot läuft...")
     app.run_polling()
 
 
