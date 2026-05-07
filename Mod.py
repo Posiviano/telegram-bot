@@ -5,7 +5,6 @@ from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     MessageHandler,
-    ChatMemberHandler,
     ContextTypes,
     filters,
 )
@@ -13,7 +12,9 @@ from telegram.ext import (
 TOKEN = os.getenv("TOKEN")
 WARN_LIMIT = int(os.getenv("WARN_LIMIT", "3"))
 LOG_CHAT_ID = os.getenv("LOG_CHAT_ID")
+
 WARN_FILE = Path("warnings.json")
+USER_FILE = Path("user_names.json")
 
 BLOCKED_WORDS = [
     "sex",
@@ -39,17 +40,17 @@ BLOCKED_WORDS = [
 ]
 
 
-def load_warnings():
-    if WARN_FILE.exists():
+def load_json(path: Path):
+    if path.exists():
         try:
-            return json.loads(WARN_FILE.read_text(encoding="utf-8"))
+            return json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             return {}
     return {}
 
 
-def save_warnings(data):
-    WARN_FILE.write_text(
+def save_json(path: Path, data):
+    path.write_text(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
@@ -86,10 +87,69 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
         print(f"Log Fehler: {e}")
 
 
+async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message or update.edited_message
+
+    if not message or not message.from_user:
+        return
+
+    user = message.from_user
+    chat_id = str(update.effective_chat.id)
+    user_id = str(user.id)
+
+    current_name = user.full_name or "kein Name"
+    current_username = f"@{user.username}" if user.username else "kein Username"
+
+    data = load_json(USER_FILE)
+    data.setdefault(chat_id, {})
+
+    old_data = data[chat_id].get(user_id)
+
+    if old_data:
+        old_name = old_data.get("name", "kein Name")
+        old_username = old_data.get("username", "kein Username")
+
+        name_changed = old_name != current_name
+        username_changed = old_username != current_username
+
+        if name_changed or username_changed:
+            parts = []
+
+            if name_changed:
+                parts.append(f"🔄 Name geändert:\n{old_name} → {current_name}")
+
+            if username_changed:
+                parts.append(f"👤 Username geändert:\n{old_username} → {current_username}")
+
+            text = "\n\n".join(parts)
+
+            try:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=text
+                )
+            except Exception as e:
+                print(f"Namensänderung konnte nicht gesendet werden: {e}")
+
+            await send_log(context, text)
+
+    data[chat_id][user_id] = {
+        "name": current_name,
+        "username": current_username,
+    }
+
+    save_json(USER_FILE, data)
+
+
 async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.message or update.edited_message
 
-    if not message or not message.text:
+    if not message:
+        return
+
+    await check_name_change(update, context)
+
+    if not message.text:
         return
 
     user = message.from_user
@@ -110,7 +170,7 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         print(f"Nachricht konnte nicht geloescht werden: {e}")
 
-    warnings = load_warnings()
+    warnings = load_json(WARN_FILE)
     chat_id = str(update.effective_chat.id)
     user_id = str(user.id)
 
@@ -119,7 +179,7 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     warnings[chat_id][user_id] += 1
     count = warnings[chat_id][user_id]
 
-    save_warnings(warnings)
+    save_json(WARN_FILE, warnings)
 
     name = user.full_name
     username = f"@{user.username}" if user.username else "kein Username"
@@ -127,7 +187,7 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text=(
-            f"⚠️ Verwarnung fuer {name} ({username})\n\n"
+            f"⚠️ Verwarnung für {name} ({username})\n\n"
             f"Grund: Unerlaubter Inhalt / gesperrtes Wort\n"
             f"Verwarnung: {count}/{WARN_LIMIT}\n\n"
             "Bitte beachte die Gruppenregeln."
@@ -174,41 +234,6 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             print(f"User konnte nicht gebannt werden: {e}")
 
 
-async def name_change_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chat_member = update.chat_member
-
-    if not chat_member:
-        return
-
-    old_user = chat_member.old_chat_member.user
-    new_user = chat_member.new_chat_member.user
-
-    old_name = old_user.full_name
-    new_name = new_user.full_name
-
-    old_username = old_user.username or "kein Username"
-    new_username = new_user.username or "kein Username"
-
-    if old_name != new_name or old_username != new_username:
-        text = (
-            "🔄 Mitgliedsdaten geaendert\n\n"
-            f"Alter Name: {old_name}\n"
-            f"Neuer Name: {new_name}\n\n"
-            f"Alter Username: @{old_username}\n"
-            f"Neuer Username: @{new_username}"
-        )
-
-        try:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=text,
-            )
-        except Exception as e:
-            print(f"Name Change Nachricht Fehler: {e}")
-
-        await send_log(context, text)
-
-
 def main():
     if not TOKEN:
         raise RuntimeError(
@@ -219,26 +244,12 @@ def main():
 
     app.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.ALL & ~filters.COMMAND,
             moderate_message
         )
     )
 
-    app.add_handler(
-        MessageHandler(
-            filters.UpdateType.EDITED_MESSAGE,
-            moderate_message
-        )
-    )
-
-    app.add_handler(
-        ChatMemberHandler(
-            name_change_log,
-            ChatMemberHandler.CHAT_MEMBER
-        )
-    )
-
-    print("NdeGroundArt ModBot laeuft 24/7 auf Render...")
+    print("NdeGroundArt ModBot läuft 24/7 auf Render...")
     app.run_polling()
 
 
