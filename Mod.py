@@ -1,6 +1,7 @@
 import os
 import json
 from pathlib import Path
+
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -17,15 +18,51 @@ WARN_FILE = Path("warnings.json")
 USER_FILE = Path("user_names.json")
 
 BLOCKED_WORDS = [
+    # Deutsch
     "sex",
     "porno",
     "porn",
     "nude",
     "nackt",
+    "nakt",
     "nacktbilder",
+    "ficken",
+    "fick",
+    "fotze",
+    "schlampe",
+    "nutte",
+    "hure",
+    "hurensohn",
+    "arsch",
+    "arschloch",
+    "wichser",
+    "wixer",
+    "wixen",
+    "missgeburt",
+    "spast",
+    "behindert",
+    "idiot",
+    "opfer",
+    "bastard",
+    "schwuchtel",
+    "verpiss",
+    "halt die fresse",
+    "fresse",
+    "huso",
+    "mongo",
+    "knecht",
+    "dummkopf",
+
+    # Gewalt
     "gewalt",
     "kill",
     "mord",
+    "sterben",
+    "umbringen",
+    "erschiessen",
+    "waffe",
+
+    # Drogen
     "droge",
     "drogen",
     "kokain",
@@ -36,7 +73,21 @@ BLOCKED_WORDS = [
     "weed",
     "cannabis",
     "hass",
-    "beleidigung",
+    "ecstasy",
+    "mdma",
+
+    # Englisch
+    "bitch",
+    "fuck",
+    "fucking",
+    "asshole",
+    "slut",
+    "whore",
+    "niga",
+    "nigga",
+    "nigger",
+    "negger",
+    "neg4",
 ]
 
 
@@ -56,11 +107,13 @@ def save_json(path: Path, data):
     )
 
 
-async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
+async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id):
     try:
         chat_id = update.effective_chat.id
         member = await context.bot.get_chat_member(chat_id, user_id)
+
         return member.status in ["administrator", "creator"]
+
     except Exception as e:
         print(f"Admin Check Fehler: {e}")
         return False
@@ -68,9 +121,11 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: 
 
 def contains_blocked_word(text: str):
     text_lower = text.lower()
+
     for word in BLOCKED_WORDS:
         if word.lower() in text_lower:
             return word
+
     return None
 
 
@@ -83,17 +138,20 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, text: str):
             chat_id=int(LOG_CHAT_ID),
             text=text
         )
+
     except Exception as e:
         print(f"Log Fehler: {e}")
 
 
 async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     message = update.message or update.edited_message
 
     if not message or not message.from_user:
         return
 
     user = message.from_user
+
     chat_id = str(update.effective_chat.id)
     user_id = str(user.id)
 
@@ -101,11 +159,13 @@ async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_username = f"@{user.username}" if user.username else "kein Username"
 
     data = load_json(USER_FILE)
+
     data.setdefault(chat_id, {})
 
     old_data = data[chat_id].get(user_id)
 
     if old_data:
+
         old_name = old_data.get("name", "kein Name")
         old_username = old_data.get("username", "kein Username")
 
@@ -113,13 +173,18 @@ async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
         username_changed = old_username != current_username
 
         if name_changed or username_changed:
+
             parts = []
 
             if name_changed:
-                parts.append(f"🔄 Name geändert:\n{old_name} → {current_name}")
+                parts.append(
+                    f"🔄 Name geändert:\n{old_name} ➜ {current_name}"
+                )
 
             if username_changed:
-                parts.append(f"👤 Username geändert:\n{old_username} → {current_username}")
+                parts.append(
+                    f"👤 Username geändert:\n{old_username} ➜ {current_username}"
+                )
 
             text = "\n\n".join(parts)
 
@@ -128,6 +193,7 @@ async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chat_id=update.effective_chat.id,
                     text=text
                 )
+
             except Exception as e:
                 print(f"Namensänderung konnte nicht gesendet werden: {e}")
 
@@ -142,6 +208,7 @@ async def check_name_change(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     message = update.message or update.edited_message
 
     if not message:
@@ -167,16 +234,20 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await message.delete()
+
     except Exception as e:
-        print(f"Nachricht konnte nicht geloescht werden: {e}")
+        print(f"Nachricht konnte nicht gelöscht werden: {e}")
 
     warnings = load_json(WARN_FILE)
+
     chat_id = str(update.effective_chat.id)
     user_id = str(user.id)
 
     warnings.setdefault(chat_id, {})
     warnings[chat_id].setdefault(user_id, 0)
+
     warnings[chat_id][user_id] += 1
+
     count = warnings[chat_id][user_id]
 
     save_json(WARN_FILE, warnings)
@@ -188,35 +259,40 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=update.effective_chat.id,
         text=(
             f"⚠️ Verwarnung für {name} ({username})\n\n"
-            f"Grund: Unerlaubter Inhalt / gesperrtes Wort\n"
+            f"Grund: Gesperrtes Wort erkannt\n"
+            f"Treffer: {found_word}\n"
             f"Verwarnung: {count}/{WARN_LIMIT}\n\n"
-            "Bitte beachte die Gruppenregeln."
+            f"Bitte beachte die Gruppenregeln."
         ),
     )
 
     await send_log(
         context,
         (
-            "🛡 ModBot Aktion\n\n"
+            "🛡️ ModBot Aktion\n\n"
             f"User: {name} ({username})\n"
             f"User ID: {user.id}\n"
             f"Chat ID: {update.effective_chat.id}\n"
-            f"Grund: gesperrtes Wort erkannt\n"
             f"Treffer: {found_word}\n"
-            f"Warnungen: {count}/{WARN_LIMIT}"
+            f"Verwarnungen: {count}/{WARN_LIMIT}"
         ),
     )
 
     if count >= WARN_LIMIT:
+
         try:
+
             await context.bot.ban_chat_member(
                 chat_id=update.effective_chat.id,
-                user_id=user.id,
+                user_id=user.id
             )
 
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"🚫 {name} wurde nach {WARN_LIMIT} Verwarnungen gebannt.",
+                text=(
+                    f"🚫 {name} wurde nach "
+                    f"{WARN_LIMIT} Verwarnungen gebannt."
+                )
             )
 
             await send_log(
@@ -235,6 +311,7 @@ async def moderate_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+
     if not TOKEN:
         raise RuntimeError(
             "TOKEN fehlt. Setze TOKEN in Render Environment Variables."
@@ -250,6 +327,7 @@ def main():
     )
 
     print("NdeGroundArt ModBot läuft 24/7 auf Render...")
+
     app.run_polling()
 
 
