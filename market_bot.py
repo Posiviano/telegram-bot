@@ -13,7 +13,6 @@ from telegram.ext import (
 
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME", "").replace("@", "").strip()
 
 OFFERS_FILE = Path("offers.json")
 
@@ -25,7 +24,7 @@ def load_offers():
         try:
             with open(OFFERS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except:
+        except Exception:
             return []
     return []
 
@@ -36,9 +35,6 @@ def save_offers(data):
 
 
 def make_link(message_id):
-    if CHANNEL_USERNAME:
-        return f"https://t.me/{CHANNEL_USERNAME}/{message_id}"
-
     clean_id = str(CHANNEL_ID).replace("-100", "")
     return f"https://t.me/c/{clean_id}/{message_id}"
 
@@ -108,7 +104,8 @@ async def kontakt(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🏷 Hashtags senden\n\n"
         "Beispiele:\n"
         "#Acryl #Leinwand #Abstract\n"
-        "#DigitalArt #Fotografie"
+        "#DigitalArt #Fotografie\n"
+        "#Aquarell #Kunst #Malerei"
     )
 
     return HASHTAGS
@@ -202,7 +199,7 @@ async def featured(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print(e)
 
         await update.message.reply_text(
-            "❌ Fehler beim Veröffentlichen."
+            "❌ Fehler beim Veröffentlichen.\n\nBitte wende dich an einen Admin."
         )
 
     context.user_data.clear()
@@ -217,7 +214,10 @@ async def suche(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "/suche Acryl\n"
             "/suche Leinwand\n"
             "/suche Abstract\n"
-            "/suche Fotografie"
+            "/suche Fotografie\n"
+            "/suche Aquarell\n"
+            "/suche Kunst\n"
+            "/suche Malerei"
         )
         return
 
